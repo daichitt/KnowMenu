@@ -1,24 +1,63 @@
-import {createContext, ReactNode, useContext, useEffect} from 'react'
-import makeEnum, {type IEnum} from 'mkenum'
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Localization from 'expo-localization';
+import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
 
-const localeKey = 'locale'
-export const LocaleEnum = makeEnum('en', 'ja')
-export type ILocaleEnum = IEnum<typeof LocaleEnum>
+import { LocaleEnum, type ILocaleEnum } from '@/lib/store';
 
-const LocaleContext = createContext<ILocaleEnum>(getLocale())
-LocaleContext.displayName = 'LocaleContext'
+export { LocaleEnum, type ILocaleEnum };
+
+const localeKey = 'locale';
+
+const listeners = new Set<() => void>();
+
+let currentLocale: ILocaleEnum = getDeviceLocale();
+
+const LocaleContext = createContext<ILocaleEnum>(currentLocale);
+LocaleContext.displayName = 'LocaleContext';
+
+function getDeviceLocale(): ILocaleEnum {
+  const languageCode = Localization.getLocales()[0]?.languageCode ?? 'en';
+  return languageCode.includes('ja') ? LocaleEnum.ja : LocaleEnum.en;
+}
+
+function notifyLocaleChange() {
+  listeners.forEach((listener) => listener());
+}
+
+function parseLocale(value: string | null): ILocaleEnum | null {
+  if (value === LocaleEnum.ja) return LocaleEnum.ja;
+  if (value === LocaleEnum.en) return LocaleEnum.en;
+  return null;
+}
+
+export async function loadLocale(): Promise<ILocaleEnum> {
+  const saved = await AsyncStorage.getItem(localeKey);
+  const locale = parseLocale(saved) ?? getDeviceLocale();
+  currentLocale = locale;
+  return locale;
+}
 
 export function getLocale() {
-	const locale = localStorage.getItem(localeKey)
-	if (locale === LocaleEnum.ja) return LocaleEnum.ja
-	if (locale === LocaleEnum.en) return LocaleEnum.en
-	return navigator.language.includes('ja') ? LocaleEnum.ja : LocaleEnum.en
+  return currentLocale;
 }
-export function setLocale(locale?: ILocaleEnum | ((lastLocale: ILocaleEnum) => ILocaleEnum | undefined)) {
-	const lastLocale = getLocale()
-	const newLocale = typeof locale === 'function' ? locale(lastLocale) : locale
-	if (!newLocale) localStorage.removeItem(localeKey)
-	else localStorage.setItem(localeKey, newLocale)
+
+export async function setLocale(
+  locale?: ILocaleEnum | ((lastLocale: ILocaleEnum) => ILocaleEnum | undefined)
+) {
+  const lastLocale = currentLocale;
+  const newLocale = typeof locale === 'function' ? locale(lastLocale) : locale;
+
+  if (!newLocale) {
+    await AsyncStorage.removeItem(localeKey);
+    currentLocale = getDeviceLocale();
+  } else {
+    await AsyncStorage.setItem(localeKey, newLocale);
+    currentLocale = newLocale;
+  }
+
+  if (lastLocale !== currentLocale) {
+    notifyLocaleChange();
+  }
 }
 
 export function useLocale() {
