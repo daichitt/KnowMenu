@@ -30,9 +30,28 @@ function parseLocale(value: string | null): ILocaleEnum | null {
   return null;
 }
 
+async function readSavedLocale(): Promise<ILocaleEnum | null> {
+  try {
+    return parseLocale(await AsyncStorage.getItem(localeKey));
+  } catch {
+    return null;
+  }
+}
+
+async function writeSavedLocale(locale: ILocaleEnum | null) {
+  try {
+    if (!locale) {
+      await AsyncStorage.removeItem(localeKey);
+    } else {
+      await AsyncStorage.setItem(localeKey, locale);
+    }
+  } catch {
+    // Storage unavailable (e.g. misconfigured native module). Keep in-memory locale only.
+  }
+}
+
 export async function loadLocale(): Promise<ILocaleEnum> {
-  const saved = await AsyncStorage.getItem(localeKey);
-  const locale = parseLocale(saved) ?? getDeviceLocale();
+  const locale = (await readSavedLocale()) ?? getDeviceLocale();
   currentLocale = locale;
   return locale;
 }
@@ -48,10 +67,10 @@ export async function setLocale(
   const newLocale = typeof locale === 'function' ? locale(lastLocale) : locale;
 
   if (!newLocale) {
-    await AsyncStorage.removeItem(localeKey);
+    await writeSavedLocale(null);
     currentLocale = getDeviceLocale();
   } else {
-    await AsyncStorage.setItem(localeKey, newLocale);
+    await writeSavedLocale(newLocale);
     currentLocale = newLocale;
   }
 
