@@ -68,8 +68,20 @@ export default function Locale({children, ja}: {children: ReactNode; ja?: ReactN
 	return <>{useLocale() === LocaleEnum.en ? children : ja ?? children}</>
 }
 
-export function LocaleProvider({children}: {children: ReactNode}) {
-	return <LocaleContext value={getLocale()}>{children}</LocaleContext>
+export function LocaleProvider({ children }: { children: ReactNode }) {
+  const [locale, setLocaleState] = useState<ILocaleEnum>(getLocale);
+
+  useEffect(() => {
+    loadLocale().then(setLocaleState);
+
+    const listener = () => setLocaleState(getLocale());
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }, []);
+
+  return <LocaleContext.Provider value={locale}>{children}</LocaleContext.Provider>;
 }
 
 export function locale<En, Ja>(en: En, {ja}: {ja?: Ja} = {}) {
