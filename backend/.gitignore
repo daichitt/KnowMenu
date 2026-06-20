@@ -1,6 +1,7 @@
 # prod
 dist/
-lambda.zip
+.wrangler/
+worker-configuration.d.ts
 
 # dev
 .yarn/
